@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AUTH·TDD — OAuth2 System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #020408;
+  --bg2:         #050c14;
+  --surface:     #09111f;
+  --surface2:    #0d1729;
+  --border:      #152035;
+  --border2:     #1c2d49;
+  --accent:      #00ffa3;
+  --accent-dim:  rgba(0,255,163,.10);
+  --accent-glow: rgba(0,255,163,.25);
+  --blue:        #38bdf8;
+  --blue-dim:    rgba(56,189,248,.10);
+  --violet:      #a78bfa;
+  --violet-dim:  rgba(167,139,250,.10);
+  --red:         #fb3570;
+  --red-dim:     rgba(251,53,112,.10);
+  --yellow:      #fbbf24;
+  --text:        #dde6f5;
+  --text2:       #7891b0;
+  --text3:       #344b67;
+  --ff-display:  'Orbitron', monospace;
+  --ff-body:     'Plus Jakarta Sans', sans-serif;
+  --ff-mono:     'JetBrains Mono', monospace;
+  --r:           5px;
+  --r2:          8px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ff-body);
+  font-size: 14px;
+  line-height: 1.65;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* dot-grid bg */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: .55;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* scan-line vignette */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, transparent, var(--bg) 75%),
+    radial-gradient(ellipse 60% 40% at 50% 110%, var(--accent-dim), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+* { position: relative; z-index: 1; }
+
+/* ── LAYOUT ── */
+.container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+/* ── NAV ── */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: rgba(2,4,8,.75);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 54px;
+}
+.logo {
+  font-family: var(--ff-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 3px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-pulse {
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .4; transform: scale(.7); }
+}
+.nav-right { display: flex; gap: 6px; align-items: center; }
+.nav-link {
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text2);
+  text-decoration: none;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  transition: all .18s;
+}
+.nav-link:hover {
+  color: var(--accent);
+  border-color: var(--border2);
+  background: var(--accent-dim);
+}
+
+/* ── HERO ── */
+.hero { padding: 88px 0 64px; text-align: center; }
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border2);
+  border-radius: 100px;
+  padding: 5px 14px;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 28px;
+  animation: fadeInUp .5s ease both;
+}
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+  animation: pulse 1.5s infinite;
+}
+
+.hero-title {
+  font-family: var(--ff-display);
+  font-size: clamp(30px, 5.5vw, 58px);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -1px;
+  margin-bottom: 18px;
+  animation: fadeInUp .5s .1s ease both;
+}
+.hero-title .t1 { color: var(--text); display: block; }
+.hero-title .t2 { color: var(--accent); display: block; }
+
+.hero-sub {
+  font-size: 15px;
+  color: var(--text2);
+  max-width: 500px;
+  margin: 0 auto 36px;
+  animation: fadeInUp .5s .2s ease both;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  animation: fadeInUp .5s .3s ease both;
+}
+.tag {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: .5px;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  padding: 4px 10px;
+  transition: all .15s;
+}
+.tag:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── SECTION HEADER ── */
+.sec-label {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.sec-title {
+  font-family: var(--ff-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 36px;
+}
+
+/* ── FLOW DIAGRAM ── */
+.flow-section {
+  padding: 64px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.flow-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.flow-row {
+  display: grid;
+  grid-template-columns: 1fr 56px 1fr;
+  align-items: center;
+}
+
+.flow-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 14px 18px;
+  transition: border-color .2s, background .2s;
+  cursor: default;
+}
+.flow-card:hover { border-color: var(--border2); background: var(--surface2); }
+.flow-card.accent-border { border-color: rgba(0,255,163,.25); }
+.flow-card.accent-border:hover { border-color: var(--accent); }
+
+.flow-card .fc-who {
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+  opacity: .7;
+}
+.flow-card .fc-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.flow-card .fc-code {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  color: var(--text3);
+  line-height: 1.7;
+  white-space: pre;
+}
+.flow-card.placeholder { background: transparent; border-color: transparent; }
+
+.flow-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 0 4px;
+}
+.flow-arrow .fa-line {
+  width: 1px;
+  flex: 1;
+  background: var(--border2);
+  min-height: 20px;
+}
+.flow-arrow .fa-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--border2);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.flow-arrow.active .fa-dot {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+.flow-arrow.active .fa-line { background: rgba(0,255,163,.2); }
+
+/* ── DEMO TERMINAL ── */
+.demo-section { padding: 64px 0; }
+
+.terminal {
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  overflow: hidden;
+  background: var(--surface);
+  animation: fadeInUp .5s .2s ease both;
+}
+
+.term-bar {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.term-dots { display: flex; gap: 7px; }
+.tdot { width: 11px; height: 11px; border-radius: 50%; }
+.tdot-r { background: #ff5f56; }
+.tdot-y { background: #ffbd2e; }
+.tdot-g { background: #27c93f; }
+.term-title {
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  color: var(--text3);
+  flex: 1;
+  text-align: center;
+}
+
+.tab-nav {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  overflow-x: auto;
+}
+.tab-btn {
+  padding: 11px 18px;
+  font-size: 11px;
+  font-family: var(--ff-mono);
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--text2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all .18s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.tab-content { display: none; padding: 24px; }
+.tab-content.active { display: block; }
+
+/* ── FORMS ── */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.form-input {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  padding: 10px 13px;
+  color: var(--text);
+  font-family: var(--ff-body);
+  font-size: 14px;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.form-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.form-input::placeholder { color: var(--text3); }
+.form-input.is-mono { font-family: var(--ff-mono); font-size: 12px; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-radius: var(--r);
+  cursor: pointer;
+  border: 1px solid;
+  transition: all .18s;
+}
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+}
+.btn-primary:hover:not(:disabled) {
+  background: transparent;
+  color: var(--accent);
+  box-shadow: 0 0 18px var(--accent-glow);
+}
+.btn-outline {
+  background: transparent;
+  border-color: var(--border2);
+  color: var(--text2);
+}
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+.btn-danger {
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--red-dim);
+  box-shadow: 0 0 14px rgba(251,53,112,.2);
+}
+.btn-sm { padding: 5px 12px; font-size: 10px; }
+
+/* ── RESPONSE ── */
+.resp {
+  margin-top: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+  font-family: var(--ff-mono);
+  font-size: 11.5px;
+  line-height: 1.8;
+  min-height: 72px;
+  color: var(--text2);
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+  transition: border-color .2s;
+}
+.resp.ok  { border-color: rgba(0,255,163,.3); }
+.resp.err { border-color: rgba(251,53,112,.35); }
+
+.rk { color: var(--blue); }
+.rs { color: var(--accent); }
+.rn { color: var(--yellow); }
+.rb { color: var(--violet); }
+.rn2 { color: var(--text3); }
+
+/* ── TOKEN DISPLAY ── */
+.token-wrap {
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 11px 80px 11px 13px;
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--accent);
+  word-break: break-all;
+  line-height: 1.6;
+}
+.copy-btn {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 3px 9px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .15s;
+}
+.copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── OAUTH STEPS ── */
+.oauth-step {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.oauth-step.step-active { border-color: var(--yellow); }
+.oauth-step.step-done   { border-color: rgba(0,255,163,.35); }
+.oauth-step.step-error  { border-color: rgba(251,53,112,.35); }
+
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 15px;
+  background: var(--surface2);
+}
+.step-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  color: var(--text3);
+  flex-shrink: 0;
+  transition: all .2s;
+}
+.oauth-step.step-active .step-badge { border-color: var(--yellow); color: var(--yellow); }
+.oauth-step.step-done   .step-badge { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.oauth-step.step-error  .step-badge { border-color: var(--red); color: var(--red); }
+
+.step-label { font-size: 13px; color: var(--text); flex: 1; }
+.step-stat  {
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  padding: 2px 9px;
+  border-radius: 100px;
+  color: var(--text3);
+}
+.oauth-step.step-active .step-stat { color: var(--yellow); }
+.oauth-step.step-done   .step-stat { color: var(--accent); }
+.oauth-step.step-error  .step-stat { color: var(--red); }
+
+.step-body {
+  display: none;
+  padding: 14px 15px;
+  border-top: 1px solid var(--border);
+}
+.oauth-step.step-active .step-body,
+.oauth-step.step-done   .step-body { display: block; }
+.oauth-step.step-error  .step-body { display: block; }
+
+/* ── JWT INSPECTOR ── */
+.jwt-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.jwt-part {
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.jwt-part-label {
+  padding: 7px 12px;
+  font-family: var(--ff-mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.jwt-part:nth-child(1) .jwt-part-label { color: var(--red); background: var(--red-dim); }
+.jwt-part:nth-child(2) .jwt-part-label { color: var(--blue); background: var(--blue-dim); }
+.jwt-part:nth-child(3) .jwt-part-label { color: var(--violet); background: var(--violet-dim); }
+.jwt-part-body {
+  padding: 12px;
+  font-family: var(--ff-mono);
+  font-size: 10.5px;
+  line-height: 1.8;
+  word-break: break-all;
+  color: var(--text2);
+  min-height: 70px;
+}
+
+/* ── API REFERENCE ── */
+.api-section {
+  padding: 64px 0;
+  border-top: 1px solid var(--border);
+}
+.endpoints-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 10px;
+}
+.endpoint-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  transition: border-color .18s, background .18s;
+}
+.endpoint-card:hover { border-color: var(--border2); background: var(--surface2); }
+.method-badge {
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-right: 7px;
+}
+.get  { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(56,189,248,.2); }
+.post { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,255,163,.2); }
+.ep-path {
+  font-family: var(--ff-mono);
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+.ep-desc { font-size: 12px; color: var(--text2); margin-top: 7px; line-height: 1.5; }
+.ep-tag {
+  display: inline-block;
+  font-family: var(--ff-mono);
+  font-size: 9px;
+  padding: 2px 7px;
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  color: var(--text3);
+  margin-top: 8px;
+}
+
+/* ── FOOTER ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 32px 0;
+  text-align: center;
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--text3);
+}
+footer a { color: var(--text3); text-decoration: none; }
+footer a:hover { color: var(--accent); }
+
+/* ── TOAST ── */
+#toast {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  padding: 11px 18px;
+  border-radius: var(--r);
+  font-family: var(--ff-mono);
+  font-size: 12px;
+  z-index: 999;
+  max-width: 340px;
+  transform: translateY(60px);
+  opacity: 0;
+  transition: all .28s cubic-bezier(.175,.885,.32,1.275);
+  pointer-events: none;
+  border: 1px solid;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.ok  { background: var(--surface2); border-color: rgba(0,255,163,.4); color: var(--accent); }
+#toast.err { background: var(--surface2); border-color: rgba(251,53,112,.4); color: var(--red); }
+#toast.inf { background: var(--surface2); border-color: rgba(56,189,248,.4); color: var(--blue); }
+
+/* ── UTILITIES ── */
+.two-col  { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.flex     { display: flex; }
+.wrap     { flex-wrap: wrap; }
+.gap-8    { gap: 8px; }
+.gap-12   { gap: 12px; }
+.mt-8     { margin-top: 8px; }
+.mt-12    { margin-top: 12px; }
+.mt-16    { margin-top: 16px; }
+.mb-8     { margin-bottom: 8px; }
+.dim      { color: var(--text2); }
+.mono     { font-family: var(--ff-mono); }
+.xs       { font-size: 11px; }
+.spinner  {
+  display: inline-block;
+  width: 13px; height: 13px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .55s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 720px) {
+  .two-col   { grid-template-columns: 1fr; }
+  .jwt-grid  { grid-template-columns: 1fr; }
+  .flow-card .fc-code { white-space: normal; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav>
+  <div class="container">
+    <div class="nav-inner">
+      <a href="/" class="logo">
+        <div class="logo-pulse"></div>
+        AUTH<span style="color:var(--text3)">·</span>TDD
+      </a>
+      <div class="nav-right">
+        <a href="/docs"   target="_blank" class="nav-link">API Docs</a>
+        <a href="/redoc"  target="_blank" class="nav-link">ReDoc</a>
+        <a href="/health" target="_blank" class="nav-link">Health</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <div class="container">
+    <div class="status-badge">
+      <span class="status-dot"></span>
+      Sistema OAuth2 Online
+    </div>
+
+    <h1 class="hero-title">
+      <span class="t1">OAuth2 Authentication</span>
+      <span class="t2">System</span>
+    </h1>
+
+    <p class="hero-sub">
+      Authorization Code Flow com PKCE obrigatório, revogação em cascata,
+      refresh token rotacionado e proteção por scopes. Construído com FastAPI e TDD.
+    </p>
+
+    <div class="tags">
+      <span class="tag">FastAPI</span>
+      <span class="tag">PKCE · RFC 7636</span>
+      <span class="tag">JWT · HS256</span>
+      <span class="tag">RFC 6749</span>
+      <span class="tag">RFC 7009</span>
+      <span class="tag">SQLAlchemy 2.0</span>
+      <span class="tag">SDD + TDD</span>
+      <span class="tag">Python 3.12</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── FLOW DIAGRAM ── -->
+<section class="flow-section">
+  <div class="container">
+    <div class="sec-label">Authorization Code + PKCE</div>
+    <h2 class="sec-title">Como funciona o fluxo</h2>
+
+    <div class="flow-timeline">
+
+      <div class="flow-row">
+        <div class="flow-card accent-border">
+          <div class="fc-who">01 · Client</div>
+          <div class="fc-title">Gerar PKCE</div>
+          <div class="fc-code">code_verifier  = random(43-128 chars)
+code_challenge = base64url(sha256(verifier))</div>
+        </div>
+        <div class="flow-arrow active">
+          <div class="fa-line"></div>
+          <div class="fa-dot"></div>
+          <div class="fa-line"></div>
+        </div>
+        <div class="flow-card placeholder"></div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-card placeholder"></div>
+        <div class="flow-arrow">
+          <div class="fa-line"></div>
+          <div class="fa-dot"></div>
+          <div class="fa-line"></div>
+        </div>
+        <div class="flow-card">
+          <div class="fc-who">02 · Client → Server</div>
+          <div class="fc-title">GET /oauth/authorize</div>
+          <div class="fc-code">?response_type=code
+&client_id=...
+&code_challenge=...
+&code_challenge_method=S256
+&state=random</div>
+        </div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-card">
+          <div class="fc-who">03 · Server</div>
+          <div class="fc-title">Autentica usuário e valida client</div>
+          <div class="fc-code">• verifica client_id e redirect_uri
+• checa escopo solicitado
+• armazena code_challenge</div>
+        </div>
+        <div class="flow-arrow">
+          <div class="fa-line"></div>
+          <div class="fa-dot"></div>
+          <div class="fa-line"></div>
+        </div>
+        <div class="flow-card placeholder"></div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-card placeholder"></div>
+        <div class="flow-arrow">
+          <div class="fa-line"></div>
+          <div class="fa-dot"></div>
+          <div class="fa-line"></div>
+        </div>
+        <div class="flow-card">
+          <div class="fc-who">04 · Server → Client</div>
+          <div class="fc-title">302 Redirect</div>
+          <div class="fc-code">redirect_uri?code=abc123&state=xyz
+↳ código de uso único, expira em 10 min</div>
+        </div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-card accent-border">
+          <div class="fc-who">05 · Client → Server</div>
+          <div class="fc-title">POST /oauth/token</div>
+          <div class="fc-code">grant_type=authorization_code
+code=abc123
+code_verifier=original   ← prova PKCE
+client_id + client_secret</div>
+        </div>
+        <div class="flow-arrow">
+          <div class="fa-line"></div>
+          <div class="fa-dot"></div>
+          <div class="fa-line"></div>
+        </div>
+        <div class="flow-card placeholder"></div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-card placeholder"></div>
+        <div class="flow-arrow">
+          <div class="fa-line"></div>
+          <div class="fa-dot"></div>
+          <div class="fa-line"></div>
+        </div>
+        <div class="flow-card">
+          <div class="fc-who">06 · Server valida PKCE</div>
+          <div class="fc-title">sha256(code_verifier) == code_challenge?</div>
+          <div class="fc-code">Se sim → emite access_token + refresh_token
+Se não → 400 invalid_grant</div>
+        </div>
+      </div>
+
+      <div class="flow-row">
+        <div class="flow-card accent-border">
+          <div class="fc-who">07 · Client</div>
+          <div class="fc-title">Acessa recurso protegido</div>
+          <div class="fc-code">GET /users/me
+Authorization: Bearer {access_token}
+↳ scope "profile" obrigatório</div>
+        </div>
+        <div class="flow-arrow active">
+          <div class="fa-line"></div>
+          <div class="fa-dot"></div>
+          <div class="fa-line"></div>
+        </div>
+        <div class="flow-card placeholder"></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── DEMO TERMINAL ── -->
+<section class="demo-section">
+  <div class="container">
+    <div class="sec-label">Interactive Demo</div>
+    <h2 class="sec-title">Terminal de Demonstração</h2>
+
+    <div class="terminal">
+      <div class="term-bar">
+        <div class="term-dots">
+          <div class="tdot tdot-r"></div>
+          <div class="tdot tdot-y"></div>
+          <div class="tdot tdot-g"></div>
+        </div>
+        <div class="term-title">auth-tdd — demo terminal — localhost:8000</div>
+      </div>
+
+      <div class="tab-nav">
+        <button class="tab-btn active" onclick="switchTab('register')">Register</button>
+        <button class="tab-btn" onclick="switchTab('login')">Login</button>
+        <button class="tab-btn" onclick="switchTab('oauth')">OAuth2 Flow</button>
+        <button class="tab-btn" onclick="switchTab('inspector')">JWT Inspector</button>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="tab-register" class="tab-content active">
+        <div class="two-col">
+          <div>
+            <div class="form-group">
+              <label class="form-label">Nome</label>
+              <input id="r-name" type="text" class="form-input" placeholder="Alice Smith">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input id="r-email" type="email" class="form-input" placeholder="alice@example.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Senha (mín. 8 caracteres)</label>
+              <input id="r-pass" type="password" class="form-input" placeholder="Str0ng!Pass">
+            </div>
+            <button class="btn btn-primary" onclick="doRegister()">Registrar</button>
+          </div>
+          <div>
+            <div class="form-label mb-8">POST /auth/register → 201</div>
+            <div id="resp-register" class="resp">Aguardando…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOGIN -->
+      <div id="tab-login" class="tab-content">
+        <div class="two-col">
+          <div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input id="l-email" type="email" class="form-input" placeholder="alice@example.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Senha</label>
+              <input id="l-pass" type="password" class="form-input" placeholder="Str0ng!Pass">
+            </div>
+            <button class="btn btn-primary" onclick="doLogin()">Login</button>
+
+            <div id="stored-jwt-wrap" style="display:none" class="mt-16">
+              <div class="form-label mb-8">JWT Armazenado</div>
+              <div class="token-wrap">
+                <button class="copy-btn" onclick="copyJWT()">Copiar</button>
+                <span id="stored-jwt"></span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="form-label mb-8">POST /auth/login → 200</div>
+            <div id="resp-login" class="resp">Aguardando…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OAUTH2 FLOW -->
+      <div id="tab-oauth" class="tab-content">
+        <p class="dim xs" style="margin-bottom:14px">
+          Faça login primeiro para obter um JWT de usuário, depois execute o fluxo completo.
+        </p>
+
+        <div class="flex wrap gap-8" style="margin-bottom:16px">
+          <button class="btn btn-outline" onclick="setupClient()">1. Criar Cliente Demo</button>
+          <button class="btn btn-primary" id="btn-run-oauth" onclick="runOAuth()" disabled>2. Iniciar Fluxo OAuth2</button>
+          <button class="btn btn-outline btn-sm" onclick="resetOAuth()">Reset</button>
+        </div>
+
+        <div id="client-info" class="resp" style="display:none; margin-top:0; margin-bottom:14px"></div>
+
+        <!-- Step 1 -->
+        <div class="oauth-step" id="os1">
+          <div class="step-head">
+            <div class="step-badge">1</div>
+            <div class="step-label">Gerar PKCE — code_verifier + code_challenge</div>
+            <div class="step-stat" id="ss1">—</div>
+          </div>
+          <div class="step-body">
+            <div class="form-label mb-8">code_verifier</div>
+            <div class="token-wrap" style="margin-bottom:10px"><span id="disp-verifier">—</span></div>
+            <div class="form-label mb-8">code_challenge (SHA-256 + Base64URL)</div>
+            <div class="token-wrap"><span id="disp-challenge">—</span></div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="oauth-step" id="os2">
+          <div class="step-head">
+            <div class="step-badge">2</div>
+            <div class="step-label">GET /oauth/authorize → authorization_code</div>
+            <div class="step-stat" id="ss2">—</div>
+          </div>
+          <div class="step-body">
+            <div class="form-label mb-8">Authorization Code recebido</div>
+            <div class="token-wrap"><span id="disp-code">—</span></div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="oauth-step" id="os3">
+          <div class="step-head">
+            <div class="step-badge">3</div>
+            <div class="step-label">POST /oauth/token → access_token + refresh_token</div>
+            <div class="step-stat" id="ss3">—</div>
+          </div>
+          <div class="step-body">
+            <div class="form-label mb-8">access_token (JWT)</div>
+            <div class="token-wrap" style="margin-bottom:10px"><span id="disp-at">—</span></div>
+            <div class="form-label mb-8">refresh_token (opaco)</div>
+            <div class="token-wrap" style="margin-bottom:10px"><span id="disp-rt">—</span></div>
+            <div class="form-label mb-8">scope</div>
+            <div class="token-wrap"><span id="disp-scope">—</span></div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="oauth-step" id="os4">
+          <div class="step-head">
+            <div class="step-badge">4</div>
+            <div class="step-label">GET /users/me com Bearer token</div>
+            <div class="step-stat" id="ss4">—</div>
+          </div>
+          <div class="step-body">
+            <div id="resp-me" class="resp" style="margin-top:0">—</div>
+            <div class="flex wrap gap-8 mt-12">
+              <button class="btn btn-outline btn-sm" id="btn-me"      onclick="getMe()">GET /users/me</button>
+              <button class="btn btn-outline btn-sm" id="btn-refresh" onclick="doRefresh()">Renovar Token</button>
+              <button class="btn btn-danger  btn-sm" id="btn-revoke"  onclick="doRevoke()">Revogar Token</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- JWT INSPECTOR -->
+      <div id="tab-inspector" class="tab-content">
+        <div class="form-group">
+          <label class="form-label">Cole um JWT para decodificar</label>
+          <textarea id="jwt-raw" class="form-input is-mono" rows="4"
+            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            oninput="decodeJWT()"></textarea>
+        </div>
+
+        <div id="jwt-decoded" style="display:none">
+          <div class="jwt-grid">
+            <div class="jwt-part">
+              <div class="jwt-part-label">Header</div>
+              <div class="jwt-part-body" id="jp-header">—</div>
+            </div>
+            <div class="jwt-part">
+              <div class="jwt-part-label">Payload</div>
+              <div class="jwt-part-body" id="jp-payload">—</div>
+            </div>
+            <div class="jwt-part">
+              <div class="jwt-part-label">Signature</div>
+              <div class="jwt-part-body" id="jp-sig" style="color:var(--text3);font-size:10px">
+[não verificada — requer chave secreta]
+              </div>
+            </div>
+          </div>
+          <div class="mt-12">
+            <div class="form-label mb-8">Claims Decodificados</div>
+            <div id="jwt-claims" class="resp ok" style="margin-top:0">—</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /terminal -->
+  </div>
+</section>
+
+<!-- ── API REFERENCE ── -->
+<section class="api-section">
+  <div class="container">
+    <div class="sec-label">Endpoints</div>
+    <h2 class="sec-title">Referência da API</h2>
+
+    <div class="endpoints-grid">
+      <div class="endpoint-card">
+        <div><span class="method-badge post">POST</span><span class="ep-path">/auth/register</span></div>
+        <div class="ep-desc">Registra usuário. Email único, senha ≥ 8 chars. Retorna 201 com perfil.</div>
+        <span class="ep-tag">M1</span>
+      </div>
+      <div class="endpoint-card">
+        <div><span class="method-badge post">POST</span><span class="ep-path">/auth/login</span></div>
+        <div class="ep-desc">Autentica e retorna JWT de acesso. Credenciais inválidas → 401.</div>
+        <span class="ep-tag">M2</span>
+      </div>
+      <div class="endpoint-card">
+        <div><span class="method-badge get">GET</span><span class="ep-path">/oauth/authorize</span></div>
+        <div class="ep-desc">Inicia Authorization Code Flow com PKCE obrigatório (S256). Retorna 302.</div>
+        <span class="ep-tag">M3</span>
+      </div>
+      <div class="endpoint-card">
+        <div><span class="method-badge post">POST</span><span class="ep-path">/oauth/token</span></div>
+        <div class="ep-desc">Troca authorization_code por tokens (PKCE) ou renova via refresh_token.</div>
+        <span class="ep-tag">M4 · M5</span>
+      </div>
+      <div class="endpoint-card">
+        <div><span class="method-badge get">GET</span><span class="ep-path">/users/me</span></div>
+        <div class="ep-desc">Retorna perfil do usuário autenticado. Requer Bearer token com scope "profile".</div>
+        <span class="ep-tag">M6</span>
+      </div>
+      <div class="endpoint-card">
+        <div><span class="method-badge post">POST</span><span class="ep-path">/oauth/revoke</span></div>
+        <div class="ep-desc">Revoga access ou refresh token (RFC 7009). Cascata: revoga access tokens derivados.</div>
+        <span class="ep-tag">M7</span>
+      </div>
+      <div class="endpoint-card">
+        <div><span class="method-badge post">POST</span><span class="ep-path">/demo/setup</span></div>
+        <div class="ep-desc">Cria o cliente OAuth2 de demonstração com redirect_uri local.</div>
+        <span class="ep-tag">Demo</span>
+      </div>
+      <div class="endpoint-card">
+        <div><span class="method-badge get">GET</span><span class="ep-path">/health</span></div>
+        <div class="ep-desc">Health check. Retorna <code style="font-size:11px">{"status":"ok"}</code>.</div>
+        <span class="ep-tag">Meta</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>auth-tdd · OAuth2 + PKCE · FastAPI · Python 3.12 · SDD + TDD</p>
+    <p style="margin-top:8px">
+      <a href="/docs" target="_blank">/docs</a> ·
+      <a href="/redoc" target="_blank">/redoc</a> ·
+      <a href="/health" target="_blank">/health</a>
+    </p>
+  </div>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+/* ── STATE ── */
+const S = {
+  jwt: null,
+  client: null,
+  verifier: null,
+  challenge: null,
+  oauthState: null,
+  code: null,
+  at: null,
+  rt: null,
+}
+
+/* ── TABS ── */
+function switchTab(name) {
+  const names = ['register','login','oauth','inspector']
+  document.querySelectorAll('.tab-btn').forEach((b, i) =>
+    b.classList.toggle('active', names[i] === name))
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'))
+  document.getElementById(`tab-${name}`).classList.add('active')
+}
+
+/* ── HTTP ── */
+async function request(method, path, body, token, form) {
+  const headers = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  let reqBody
+  if (form) {
+    headers['Content-Type'] = 'application/x-www-form-urlencoded'
+    reqBody = new URLSearchParams(body).toString()
+  } else if (body) {
+    headers['Content-Type'] = 'application/json'
+    reqBody = JSON.stringify(body)
+  }
+  const r = await fetch(path, { method, headers, body: reqBody })
+  let data = null
+  try { data = await r.json() } catch {}
+  return { ok: r.ok, status: r.status, data }
+}
+
+/* ── JSON HIGHLIGHT ── */
+function hl(obj) {
+  if (!obj) return '<span class="rn2">null</span>'
+  return JSON.stringify(obj, null, 2)
+    .replace(/"([^"]+)":/g, '<span class="rk">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="rs">"$1"</span>')
+    .replace(/: (-?\d+\.?\d*)/g, ': <span class="rn">$1</span>')
+    .replace(/: (true|false)/g, ': <span class="rb">$1</span>')
+    .replace(/: null/g, ': <span class="rn2">null</span>')
+}
+
+function setResp(id, result) {
+  const el = document.getElementById(id)
+  el.innerHTML = hl(result.data)
+  el.className = `resp ${result.ok ? 'ok' : 'err'}`
+}
+
+/* ── TOAST ── */
+let _tid
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast')
+  el.textContent = msg
+  el.className = `show ${type}`
+  clearTimeout(_tid)
+  _tid = setTimeout(() => el.classList.remove('show'), 3400)
+}
+
+/* ── REGISTER ── */
+async function doRegister() {
+  const name  = document.getElementById('r-name').value.trim()
+  const email = document.getElementById('r-email').value.trim()
+  const pass  = document.getElementById('r-pass').value
+  if (!name || !email || !pass) { toast('Preencha todos os campos', 'err'); return }
+  document.getElementById('resp-register').innerHTML = '<span class="spinner"></span>'
+  const r = await request('POST', '/auth/register', { name, email, password: pass })
+  setResp('resp-register', r)
+  if (r.ok) {
+    toast('Usuário criado!')
+    document.getElementById('l-email').value = email
+    document.getElementById('l-pass').value = pass
+  } else {
+    toast(r.data?.detail || 'Erro no registro', 'err')
+  }
+}
+
+/* ── LOGIN ── */
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim()
+  const pass  = document.getElementById('l-pass').value
+  if (!email || !pass) { toast('Preencha email e senha', 'err'); return }
+  document.getElementById('resp-login').innerHTML = '<span class="spinner"></span>'
+  const r = await request('POST', '/auth/login', { email, password: pass })
+  setResp('resp-login', r)
+  if (r.ok && r.data?.access_token) {
+    S.jwt = r.data.access_token
+    document.getElementById('stored-jwt-wrap').style.display = 'block'
+    document.getElementById('stored-jwt').textContent = S.jwt
+    document.getElementById('btn-run-oauth').disabled = false
+    document.getElementById('jwt-raw').value = S.jwt
+    decodeJWT()
+    toast('Login OK · JWT salvo')
+  } else {
+    toast(r.data?.detail || 'Credenciais inválidas', 'err')
+  }
+}
+
+function copyJWT() {
+  navigator.clipboard.writeText(S.jwt || '')
+  toast('Copiado!')
+}
+
+/* ── DEMO CLIENT ── */
+async function setupClient() {
+  const r = await request('POST', '/demo/setup')
+  const el = document.getElementById('client-info')
+  el.style.display = 'block'
+  el.innerHTML = hl(r.data)
+  el.className = `resp ${r.ok ? 'ok' : 'err'}`
+  if (r.ok) {
+    S.client = r.data
+    toast('Cliente demo pronto!')
+  } else {
+    toast('Erro ao criar cliente', 'err')
+  }
+}
+
+/* ── PKCE ── */
+function genVerifier() {
+  const a = new Uint8Array(32)
+  crypto.getRandomValues(a)
+  return btoa(String.fromCharCode(...a))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'')
+}
+
+async function genChallenge(v) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v))
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'')
+}
+
+/* ── OAUTH STEP UI ── */
+function setStep(n, state) {
+  const el = document.getElementById(`os${n}`)
+  const ss = document.getElementById(`ss${n}`)
+  el.className = 'oauth-step step-' + state
+  ss.textContent = { pending:'—', active:'em progresso…', done:'✓ concluído', error:'✗ erro' }[state] || state
+}
+
+/* ── RUN OAUTH FLOW ── */
+async function runOAuth() {
+  if (!S.jwt) { toast('Faça login primeiro', 'err'); switchTab('login'); return }
+  if (!S.client) { toast('Crie o cliente demo primeiro', 'inf'); return }
+
+  resetOAuth(false)
+
+  // Step 1 — PKCE
+  setStep(1, 'active')
+  S.verifier = genVerifier()
+  S.challenge = await genChallenge(S.verifier)
+  S.oauthState = genVerifier().slice(0, 16)
+  document.getElementById('disp-verifier').textContent = S.verifier
+  document.getElementById('disp-challenge').textContent = S.challenge
+  setStep(1, 'done')
+
+  await wait(350)
+
+  // Step 2 — authorize
+  setStep(2, 'active')
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: S.client.client_id,
+    redirect_uri: S.client.redirect_uri,
+    scope: 'openid profile email',
+    state: S.oauthState,
+    code_challenge: S.challenge,
+    code_challenge_method: 'S256',
+  })
+
+  let authCode = null
+  try {
+    const resp = await fetch(`/oauth/authorize?${params}`, {
+      headers: { 'Authorization': `Bearer ${S.jwt}` },
+      redirect: 'follow',
+    })
+
+    // Try JSON body (from /demo/callback endpoint)
+    try {
+      const body = await resp.json()
+      if (body?.error) throw new Error(body.error)
+      authCode = body?.code
+    } catch {}
+
+    // Fallback: read from response URL
+    if (!authCode) {
+      const url = new URL(resp.url)
+      const err = url.searchParams.get('error')
+      if (err) throw new Error(err)
+      authCode = url.searchParams.get('code')
+    }
+
+    if (!authCode) throw new Error('Código de autorização não recebido')
+  } catch (e) {
+    setStep(2, 'error')
+    toast('Erro na autorização: ' + e.message, 'err')
+    return
+  }
+
+  S.code = authCode
+  document.getElementById('disp-code').textContent = authCode
+  setStep(2, 'done')
+
+  await wait(350)
+
+  // Step 3 — token exchange
+  setStep(3, 'active')
+  const tr = await request('POST', '/oauth/token', {
+    grant_type: 'authorization_code',
+    code: S.code,
+    redirect_uri: S.client.redirect_uri,
+    client_id: S.client.client_id,
+    client_secret: S.client.client_secret,
+    code_verifier: S.verifier,
+  }, null, true)
+
+  if (!tr.ok) {
+    setStep(3, 'error')
+    toast(tr.data?.error_description || 'Erro na troca de tokens', 'err')
+    return
+  }
+
+  S.at = tr.data.access_token
+  S.rt = tr.data.refresh_token
+  document.getElementById('disp-at').textContent = S.at
+  document.getElementById('disp-rt').textContent = S.rt
+  document.getElementById('disp-scope').textContent = tr.data.scope || 'openid profile email'
+  setStep(3, 'done')
+  toast('Tokens OAuth2 obtidos!')
+
+  await wait(350)
+
+  // Step 4 — use token
+  setStep(4, 'active')
+  await getMe()
+}
+
+/* ── PROTECTED RESOURCE ── */
+async function getMe() {
+  if (!S.at) { toast('Execute o fluxo OAuth2 primeiro', 'err'); return }
+  setStep(4, 'active')
+  const r = await request('GET', '/users/me', null, S.at)
+  const el = document.getElementById('resp-me')
+  el.innerHTML = hl(r.data)
+  el.className = `resp ${r.ok ? 'ok' : 'err'}`
+  if (r.ok) { setStep(4, 'done'); toast('Recurso acessado com sucesso!') }
+  else      { setStep(4, 'error'); toast('Erro ao acessar recurso', 'err') }
+}
+
+/* ── REFRESH TOKEN ── */
+async function doRefresh() {
+  if (!S.rt || !S.client) { toast('Sem refresh token disponível', 'err'); return }
+  const r = await request('POST', '/oauth/token', {
+    grant_type: 'refresh_token',
+    refresh_token: S.rt,
+    client_id: S.client.client_id,
+    client_secret: S.client.client_secret,
+  }, null, true)
+  if (r.ok) {
+    S.at = r.data.access_token
+    S.rt = r.data.refresh_token
+    document.getElementById('disp-at').textContent = S.at
+    document.getElementById('disp-rt').textContent = S.rt
+    toast('Token renovado! access_token + refresh_token atualizados.')
+  } else {
+    toast(r.data?.error || 'Erro ao renovar token', 'err')
+  }
+}
+
+/* ── REVOKE ── */
+async function doRevoke() {
+  if (!S.at || !S.client) { toast('Sem token para revogar', 'err'); return }
+  const r = await request('POST', '/oauth/revoke', {
+    token: S.at,
+    token_type_hint: 'access_token',
+    client_id: S.client.client_id,
+    client_secret: S.client.client_secret,
+  }, null, true)
+  if (r.ok) {
+    toast('Token revogado! Verificando…', 'inf')
+    await wait(400)
+    const check = await request('GET', '/users/me', null, S.at)
+    const el = document.getElementById('resp-me')
+    el.innerHTML = hl(check.data) + '\n/* ← token revogado: 401 esperado */'
+    el.className = 'resp err'
+    setStep(4, 'error')
+    toast(`Confirmado — token revogado (${check.status})`, 'err')
+  }
+}
+
+/* ── RESET OAUTH ── */
+function resetOAuth(full = true) {
+  S.verifier = S.challenge = S.oauthState = S.code = S.at = S.rt = null
+  ;[1,2,3,4].forEach(n => {
+    document.getElementById(`os${n}`).className = 'oauth-step'
+    document.getElementById(`ss${n}`).textContent = '—'
+  })
+  document.getElementById('disp-verifier').textContent = '—'
+  document.getElementById('disp-challenge').textContent = '—'
+  document.getElementById('disp-code').textContent = '—'
+  document.getElementById('disp-at').textContent = '—'
+  document.getElementById('disp-rt').textContent = '—'
+  document.getElementById('disp-scope').textContent = '—'
+  document.getElementById('resp-me').innerHTML = '—'
+  document.getElementById('resp-me').className = 'resp'
+  if (full) {
+    S.client = null
+    document.getElementById('client-info').style.display = 'none'
+    document.getElementById('btn-run-oauth').disabled = !S.jwt
+  }
+}
+
+/* ── JWT INSPECTOR ── */
+function b64url(s) {
+  return atob(s.replace(/-/g,'+').replace(/_/g,'/').padEnd(s.length + (4 - s.length%4)%4, '='))
+}
+
+function decodeJWT() {
+  const raw = document.getElementById('jwt-raw').value.trim()
+  const out = document.getElementById('jwt-decoded')
+  if (!raw || !raw.includes('.')) { out.style.display = 'none'; return }
+  const parts = raw.split('.')
+  if (parts.length !== 3) { out.style.display = 'none'; return }
+  out.style.display = 'block'
+  try {
+    const h = JSON.parse(b64url(parts[0]))
+    document.getElementById('jp-header').innerHTML = hl(h)
+  } catch { document.getElementById('jp-header').textContent = parts[0] }
+  try {
+    const p = JSON.parse(b64url(parts[1]))
+    document.getElementById('jp-payload').innerHTML = hl(p)
+    const claims = {}
+    if (p.sub)   claims.subject = p.sub
+    if (p.email) claims.email   = p.email
+    if (p.scope) claims.scope   = p.scope
+    if (p.jti)   claims.jti     = p.jti
+    if (p.iat)   claims.issued_at = new Date(p.iat*1000).toLocaleString('pt-BR')
+    if (p.exp) {
+      const exp = new Date(p.exp*1000)
+      claims.expires_at = exp.toLocaleString('pt-BR')
+      claims.status = exp > new Date() ? '✓ válido' : '✗ expirado'
+    }
+    const cl = document.getElementById('jwt-claims')
+    cl.innerHTML = hl(claims)
+    cl.className = 'resp ok'
+  } catch { document.getElementById('jp-payload').textContent = parts[1] }
+  document.getElementById('jp-sig').textContent = parts[2].slice(0,32) + '…'
+}
+
+/* ── UTILITIES ── */
+function wait(ms) { return new Promise(r => setTimeout(r, ms)) }
+
+/* ── INIT ── */
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return
+  const active = document.querySelector('.tab-content.active')
+  if (active?.id === 'tab-register') doRegister()
+  else if (active?.id === 'tab-login') doLogin()
+})
+</script>
+</body>
+</html>
