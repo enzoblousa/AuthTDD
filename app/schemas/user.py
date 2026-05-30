@@ -33,3 +33,9 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserProfileResponse(UserResponse):
+    """Resposta de GET /users/me — inclui scopes do token (M6)."""
+
+    scopes: list[str] = []

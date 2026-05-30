@@ -116,3 +116,117 @@ async def test_authenticate_user_with_nonexistent_email_returns_none(db_session)
     result = await authenticate_user(db_session, "naoexiste@exemplo.com", "Senha1234")
 
     assert result is None
+
+
+# =============================================================================
+# M6 — Rotas protegidas: get_current_user_from_token + require_scope (U1–U6)
+# =============================================================================
+
+from datetime import timedelta
+
+import pytest
+from fastapi import HTTPException
+
+from app.core.security import hash_password
+from app.models.user import User
+from app.services.auth_service import get_current_user_from_token
+from app.services.token_service import create_access_token
+
+
+# --- M6·U1: token válido retorna o user correto -----------------------------
+
+
+async def test_valid_token_returns_correct_user(db_session):
+    """M6·U1: JWT válido → objeto User com o sub correto."""
+    user = User(
+        name="Protected User",
+        email="protected@example.com",
+        hashed_password=hash_password("Senha1234"),
+        is_active=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+
+    token = create_access_token({"sub": str(user.id), "scope": "openid profile"})
+    result = await get_current_user_from_token(token, db_session)
+    assert result.id == user.id
+
+
+# --- M6·U2: token expirado lança 401 ----------------------------------------
+
+
+async def test_expired_token_raises_401(db_session):
+    """M6·U2: JWT com exp no passado → HTTPException 401."""
+    token = create_access_token(
+        {"sub": "any-id", "scope": "openid"},
+        expires_delta=timedelta(seconds=-1),
+    )
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user_from_token(token, db_session)
+    assert exc.value.status_code == 401
+
+
+# --- M6·U3: token com assinatura inválida lança 401 -------------------------
+
+
+async def test_tampered_token_raises_401(db_session):
+    """M6·U3: JWT adulterado → HTTPException 401."""
+    token = create_access_token({"sub": "any-id", "scope": "openid"})
+    tampered = token[:-1] + ("X" if token[-1] != "X" else "Y")
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user_from_token(tampered, db_session)
+    assert exc.value.status_code == 401
+
+
+# --- M6·U4: usuário inativo lança 401 ----------------------------------------
+
+
+async def test_inactive_user_raises_401(db_session):
+    """M6·U4: is_active=False → HTTPException 401."""
+    inactive = User(
+        name="Inactive",
+        email="inactive@example.com",
+        hashed_password=hash_password("Senha1234"),
+        is_active=False,
+    )
+    db_session.add(inactive)
+    await db_session.commit()
+    await db_session.refresh(inactive)
+
+    token = create_access_token({"sub": str(inactive.id), "scope": "openid"})
+    with pytest.raises(HTTPException) as exc:
+        await get_current_user_from_token(token, db_session)
+    assert exc.value.status_code == 401
+
+
+# --- M6·U5: require_scope com scope presente não lança ----------------------
+
+
+async def test_require_scope_passes_when_scope_present():
+    """M6·U5: scope presente → sem exceção."""
+    from app.core.dependencies import require_scope
+    from app.schemas.token import TokenData
+
+    token_data = TokenData(
+        sub="uid", scopes=["openid", "profile"], jti="test-jti", exp=9_999_999_999
+    )
+    checker = require_scope("profile")
+    await checker(token_data)  # deve passar sem exceção
+
+
+# --- M6·U6: require_scope com scope ausente lança 403 -----------------------
+
+
+async def test_require_scope_raises_403_when_scope_missing():
+    """M6·U6: scope ausente → HTTPException 403."""
+    from app.core.dependencies import require_scope
+    from app.schemas.token import TokenData
+
+    token_data = TokenData(
+        sub="uid", scopes=["openid"], jti="test-jti", exp=9_999_999_999
+    )
+    checker = require_scope("profile")
+    with pytest.raises(HTTPException) as exc:
+        await checker(token_data)
+    assert exc.value.status_code == 403
